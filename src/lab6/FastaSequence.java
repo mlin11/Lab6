@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -144,56 +145,67 @@ public class FastaSequence
 	 * samples as rows…
 	 */
 
-	public static void writeFileInReducedView(File inFile, File outFile) throws Exception
+	public static void writeFileInReducedViewInMapOfMap(File inFile, File outFile) throws Exception
 	{
 		// generate a list of FastaSequence
 		List<FastaSequence> fastaList = FastaSequence.readFastaFile(inFile.toString());
-		// save in a LinkedHashMap to keep the order of sequence as insertion-order
-		// generate the key by merging sequence and sample
-		// while the value is the number of this sequence occurs in this sample
-		LinkedHashMap<String, Integer> map = new LinkedHashMap<String, Integer>();
-		// store seq_sam:count into the map
+		// save in a LinkedHashMap with the sequence as key
+		// keep the order of key as insertion-order
+		// while the value is an inner map: < sample, the number of this sequence occurs
+		// in this sample>
+		LinkedHashMap<String, Map<String, Integer>> map = new LinkedHashMap<String, Map<String, Integer>>();
+		// define a sample set to store the row names for output file in order
+		TreeSet<String> sample = new TreeSet<String>();
+		// loop through the FastaSequence list and store the value into map
 		for (FastaSequence fs : fastaList)
 		{
-			// get sequence as part of the final key
-			String seqKey = fs.getSequence();
-			// get the sample ID from header by applying StringTokenizer class as the second
-			// part of final key
+			// get sequence as outer key
+			String okey = fs.getSequence();
+			// get the sample ID from header by applying StringTokenizer class as the inner
+			// key
 			StringTokenizer sToken = new StringTokenizer(fs.getHeader());
 			sToken.nextToken();
-			String samKey = sToken.nextToken();
-			// generate the final key
-			String key = seqKey + "~" + samKey;
-			if (!map.containsKey(key))
+			String ikey = sToken.nextToken();
+			sample.add(ikey);
+			// store the values
+			if (!map.containsKey(okey))
 			{
+				// create the inner map
+				Map<String, Integer> iMap = new HashMap<String, Integer>();
 				Integer count = 1;
-				map.put(key, count);
+				iMap.put(ikey, count);
+				map.put(okey, iMap);
 			} else
 			{
-				Integer count = map.get(key);
-				count++;
-				map.put(key, count);
+				// update the inner map
+				Map<String, Integer> tMap = map.get(okey);
+				if (!tMap.containsKey(ikey))
+				{
+					Integer count = 1;
+					tMap.put(ikey, count);
+				} else
+				{
+					Integer count = tMap.get(ikey);
+					count++;
+					tMap.put(ikey, count);
+				}
 			}
 		}
 		// store sequence into a linkedHashSet for the column name in the output file
 		LinkedHashSet<String> column = new LinkedHashSet<String>();
-		// store sample into a treeSet as the row names to get the natural order
-		TreeSet<String> row = new TreeSet<String>();
 		for (String ckey : map.keySet())
 		{
 			// get sequence
-			column.add(ckey.substring(0, ckey.lastIndexOf("~")));
-			// get sample
-			row.add(ckey.substring(ckey.lastIndexOf("~") + 1));
+			column.add(ckey);
 		}
-		// write into the output
+		// write the output
 		BufferedWriter writer = new BufferedWriter(new FileWriter(outFile));
 		// write the first line
 		String firstLine = "sample" + "\t" + String.join("\t", column) + "\n";
 		writer.write(firstLine);
 		// write 2nd-last line
 		// first loop through rows
-		Iterator<String> itr = row.iterator();
+		Iterator<String> itr = sample.iterator();
 		while (itr.hasNext())
 		{
 			String element = itr.next();
@@ -202,10 +214,10 @@ public class FastaSequence
 			Iterator<String> itc = column.iterator();
 			while (itc.hasNext())
 			{
-				String fkey = itc.next() + "~" + element;
-				if (map.containsKey(fkey))
+				Map<String, Integer> pMap = map.get(itc.next());
+				if (pMap.containsKey(element))
 				{
-					writer.write(map.get(fkey) + "\t");
+					writer.write(pMap.get(element) + "\t");
 				} else
 				{
 					writer.write(0 + "\t");
@@ -215,6 +227,7 @@ public class FastaSequence
 		}
 		writer.flush();
 		writer.close();
+
 	}
 
 	// returns the header of this sequence without the “>”
@@ -269,7 +282,7 @@ public class FastaSequence
 		// write sorted count-sequence in the ascending order of count into a file
 		// FastaSequence.writeUnique(fileIn, fileOut);
 		// generate a reduce-view of sequence counts in each sample
-		FastaSequence.writeFileInReducedView(fileIn, fileOut);
+		FastaSequence.writeFileInReducedViewInMapOfMap(fileIn, fileOut);
 
 	}
 }
