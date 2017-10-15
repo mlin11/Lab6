@@ -11,7 +11,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -179,29 +178,19 @@ public class FastaSequence
 			{
 				// update the inner map
 				Map<String, Integer> tMap = map.get(okey);
-				if (!tMap.containsKey(ikey))
+				Integer count = tMap.get(ikey);
+				if (count == null)
 				{
-					Integer count = 1;
-					tMap.put(ikey, count);
-				} else
-				{
-					Integer count = tMap.get(ikey);
-					count++;
-					tMap.put(ikey, count);
+					count = 0;
 				}
+				count++;
+				tMap.put(ikey, count);
 			}
-		}
-		// store sequence into a linkedHashSet for the column name in the output file
-		LinkedHashSet<String> column = new LinkedHashSet<String>();
-		for (String ckey : map.keySet())
-		{
-			// get sequence
-			column.add(ckey);
 		}
 		// write the output
 		BufferedWriter writer = new BufferedWriter(new FileWriter(outFile));
 		// write the first line
-		String firstLine = "sample" + "\t" + String.join("\t", column) + "\n";
+		String firstLine = "sample" + "\t" + String.join("\t", map.keySet()) + "\n";
 		writer.write(firstLine);
 		// write 2nd-last line
 		// first loop through rows
@@ -211,7 +200,7 @@ public class FastaSequence
 			String element = itr.next();
 			writer.write(element + "\t");
 			// then loop through column
-			Iterator<String> itc = column.iterator();
+			Iterator<String> itc = map.keySet().iterator();
 			while (itc.hasNext())
 			{
 				Map<String, Integer> pMap = map.get(itc.next());
